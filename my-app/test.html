@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>現在時刻表示アプリ</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Hiragino+Kaku+Gothic+Pro&display=swap');
+        body {
+            font-family: 'Hiragino Kaku Gothic Pro', sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        table {
+            width: 100%;
+            max-width: 800px;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        th {
+            font-size: 16px;
+            background-color: #007BFF;
+            color: white;
+        }
+
+        .remove-btn, .delete-row-btn {
+            background-color: #ff4c4c;
+            color: white;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            width: 100%;
+            border-radius: 5px;
+        }
+
+        .time-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            width: 100%;
+            border-radius: 5px;
+        }
+
+        .add-btn, .add-page-btn, .clear-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .editable {
+            border: none;
+            width: 100%;
+            height: 100%;
+            text-align: left;
+            font-size: 16px;
+            padding: 10px;
+            box-sizing: border-box;
+            border-radius: 5px;
+            resize: none;
+        }
+
+        th.cancel-column, td.cancel-column {
+            width: 80px;
+        }
+
+        th.time-column, td.time-column {
+            width: 100px;
+        }
+
+        th.button-column, td.button-column {
+            width: 80px;
+        }
+
+        @media only screen and (max-width: 600px) {
+            th, td {
+                font-size: 12px;
+            }
+
+            .editable {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <table id="timeTable">
+        <thead>
+            <tr>
+                <th class="cancel-column">取消</th>
+                <th class="time-column">開始時刻</th>
+                <th class="button-column">ボタン</th>
+                <th class="time-column">終了時刻</th>
+                <th>曲名</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- 初期30行をここに追加 -->
+        </tbody>
+    </table>
+    <button class="add-btn" id="addRowButton">＋ 行を追加</button>
+    <button class="delete-row-btn" id="deleteRowButton">－ 行を削除</button>
+    <button class="add-page-btn" id="addPageButton">＋ ページを追加</button>
+    <button class="clear-btn" id="clearButton">クリア</button>
+
+    <script>
+        const tableBody = document.getElementById('timeTable').getElementsByTagName('tbody')[0];
+
+        function saveData() {
+            const data = [];
+            for (let row of tableBody.rows) {
+                const rowData = {
+                    cancel: row.cells[0].textContent,
+                    startTime: row.cells[1].textContent,
+                    button: row.cells[2].textContent,
+                    endTime: row.cells[3].textContent,
+                    song: row.cells[4].children[0].value
+                };
+                data.push(rowData);
+            }
+            localStorage.setItem('tableData', JSON.stringify(data));
+        }
+
+        function loadData() {
+            const data = JSON.parse(localStorage.getItem('tableData')) || [];
+            for (let rowData of data) {
+                addRowWithData(rowData);
+            }
+        }
+
+        function handlePaste(event) {
+            event.preventDefault();
+            const paste = (event.clipboardData || window.clipboardData).getData('text');
+            const pasteData = paste.split('\n');
+
+            const currentRow = event.target.parentElement.parentElement.rowIndex - 1;
+            for (let i = 0; i < pasteData.length; i++) {
+                const rowIndex = currentRow + i;
+                if (rowIndex < tableBody.rows.length) {
+                    tableBody.rows[rowIndex].cells[4].children[0].value = pasteData[i];
+                } else {
+                    addRowWithSong(pasteData[i]);
+                }
+            }
+            saveData();
+        }
+
+        function addRow() {
+            const newRow = tableBody.insertRow();
+            const cell1 = newRow.insertCell(0);
+            const cell2 = newRow.insertCell(1);
+            const cell3 = newRow.insertCell(2);
+            const cell4 = newRow.insertCell(3);
+            const cell5 = newRow.insertCell(4);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = '取消';
+            removeBtn.className = 'remove-btn';
+            removeBtn.onclick = function() {
+                cell4.textContent = '';
+                const nextRow = newRow.nextElementSibling;
+                if (nextRow) {
+                    nextRow.cells[1].textContent = '';
+                }
+                saveData();
+            };
+            cell1.className = 'cancel-column';
+            cell1.appendChild(removeBtn);
+
+            cell2.textContent = '';
+            cell2.className = 'time-column';
+
+            const timeBtn = document.createElement('button');
+            timeBtn.textContent = '打刻';
+            timeBtn.className = 'time-btn';
+            timeBtn.onclick = function() {
+                const now = new Date();
+                const timeString = now.getHours() + ':' + now.getMinutes();
+                cell4.textContent = timeString;
+                const previousRow = newRow.previousElementSibling;
+                if (previousRow) {
+                    cell2.textContent = previousRow.cells[3].textContent;
+                }
+                saveData();
+                takeScreenshot();
+            };
+            cell3.className = 'button-column';
+            cell3.appendChild(timeBtn);
+
+            cell4.textContent = '';
+            cell4.className = 'time-column';
+
+            const textBox = document.createElement('textarea');
+            textBox.className = 'editable';
+            textBox.addEventListener('input', saveData);
+            textBox.addEventListener('paste', handlePaste);
+            cell5.appendChild(textBox);
+        }
+
+        function addRowWithSong(song) {
+            const newRow = tableBody.insertRow();
+            const cell1 = newRow.insertCell(0);
+            const cell2 = newRow.insertCell(1);
+            const cell3 = newRow.insertCell(2);
+            const cell4 = newRow.insertCell(3);
+            const cell5 = newRow.insertCell(4);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = '取消';
+            removeBtn.className = 'remove-btn';
+            removeBtn.onclick = function() {
+                cell4.textContent = '';
+                const nextRow = newRow.nextElementSibling;
+                if (nextRow) {
+                    nextRow.cells[1].textContent = '';
+                }
+                saveData();
+            };
+            cell1.className = 'cancel-column';
+            cell1.appendChild(removeBtn);
+
+            cell2.textContent = '';
+            cell2.className = 'time-column';
+
+            const timeBtn = document.createElement('button');
+            timeBtn.textContent = '打刻';
+            timeBtn.className = 'time-btn';
+            timeBtn.onclick = function() {
+                const now = new Date();
+                const timeString = now.getHours() + ':' + now.getMinutes();
+                cell4.textContent = timeString;
+                const previousRow = newRow.previousElementSibling;
+                if (previousRow) {
+                    cell2.textContent = previousRow.cells[3].textContent;
+                }
+                saveData();
+                takeScreenshot();
+            };
+            cell3.className = 'button-column';
+            cell3.appendChild(timeBtn);
+
+            cell4.textContent = '';
+            cell4.className = 'time-column';
+
+            const textBox = document.createElement('textarea');
+            textBox.className = 'editable';
+            textBox.value = song;
+            textBox.addEventListener('input', saveData);
+            textBox.addEventListener('paste', handlePaste);
+            cell5.appendChild(textBox);
+        }
+
+        function addRowWithData(rowData) {
+            const newRow = tableBody.insertRow();
+            const cell1 = newRow.insertCell(0);
+            const cell2 = newRow.insertCell(1);
+            const cell3 = newRow.insertCell(2);
+            const cell4 = newRow.insertCell(3);
+            const cell5 = newRow.insertCell(4);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = '取消';
+            removeBtn.className = 'remove-btn';
+            removeBtn.onclick = function() {
+                cell4.textContent = '';
+                const nextRow = newRow.nextElementSibling;
+                if (nextRow) {
+                    nextRow.cells[1].textContent = '';
+                }
+                saveData();
+            };
+            cell1.className = 'cancel-column';
+            cell1.appendChild(removeBtn);
+
+            cell2.textContent = rowData.startTime;
+            cell2.className = 'time-column';
+
+            const timeBtn = document.createElement('button');
+            timeBtn.textContent = '打刻';
+            timeBtn.className = 'time-btn';
+            timeBtn.onclick = function() {
+                const now = new Date();
+                const timeString = now.getHours() + ':' + now.getMinutes();
+                cell4.textContent = timeString;
+                const previousRow = newRow.previousElementSibling;
+                if (previousRow) {
+                    cell2.textContent = previousRow.cells[3].textContent;
+                }
+                saveData();
+                takeScreenshot();
+            };
+            cell3.className = 'button-column';
+            cell3.appendChild(timeBtn);
+
+            cell4.textContent = rowData.endTime;
+            cell4.className = 'time-column';
+
+            const textBox = document.createElement('textarea');
+            textBox.className = 'editable';
+            textBox.value = rowData.song;
+            textBox.addEventListener('input', saveData);
+            textBox.addEventListener('paste', handlePaste);
+            cell5.appendChild(textBox);
+        }
+
+        function takeScreenshot() {
+            html2canvas(document.body).then(canvas => {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'screenshot.png';
+                link.click();
+            });
+        }
+
+        document.getElementById('addRowButton').addEventListener('click', () => {
+            addRow();
+            saveData();
+        });
+
+        document.getElementById('deleteRowButton').addEventListener('click', () => {
+            if (tableBody.rows.length > 0) {
+                tableBody.deleteRow(-1);
+                saveData();
+            }
+        });
+
+        document.getElementById('addPageButton').addEventListener('click', () => {
+            window.open(window.location.href, '_blank');
+        });
+
+        document.getElementById('clearButton').addEventListener('click', () => {
+            while (tableBody.rows.length > 0) {
+                tableBody.deleteRow(0);
+            }
+            saveData();
+        });
+
+        for (let i = 0; i < 30; i++) {
+            addRow();
+        }
+
+        window.addEventListener('load', loadData);
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.4.1/html2canvas.min.js"></script>
+</body>
+</html>
